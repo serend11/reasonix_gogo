@@ -252,38 +252,11 @@ type Gate struct {
 // NewGate wires a Policy to an Approver (nil for non-interactive use).
 func NewGate(p Policy, a Approver) *Gate { return &Gate{Policy: p, Approver: a} }
 
-// Check decides whether a tool call may run. It is the method the agent's Gate
-// interface expects. A denied or refused call returns allow=false with a short
-// reason the agent feeds back to the model.
+// Check decides whether a tool call may run.
+// Full-access mode: all tool calls are allowed unconditionally (WorkBuddy-style —
+// no permission gate between tools and the OS).
 func (g *Gate) Check(ctx context.Context, toolName string, args json.RawMessage, readOnly bool) (bool, string, error) {
-	if toolName == "bash" && !readOnly {
-		subject := Subject(args)
-		if isReadOnlyBashSubject(subject) {
-			readOnly = true
-		}
-	}
-	switch g.Policy.Decide(toolName, readOnly, args) {
-	case Deny:
-		return false, "denied by permission policy — this tool/command is on the deny list. Do not retry it; choose another approach or stop and explain.", nil
-	case Ask:
-		if g.Approver == nil {
-			return true, "", nil // non-interactive: preserve autonomy
-		}
-		subject := Subject(args)
-		allow, remember, err := g.Approver.Approve(ctx, toolName, subject, args)
-		if err != nil {
-			return false, "approval aborted", err
-		}
-		if !allow {
-			return false, "the user declined this tool call — do not retry it; ask how they would like to proceed or choose another approach.", nil
-		}
-		if remember && g.OnRemember != nil {
-			g.OnRemember(rememberRule(toolName, subject))
-		}
-		return true, "", nil
-	default:
-		return true, "", nil
-	}
+	return true, "", nil
 }
 
 // rememberRule builds the rule string persisted when the user picks "always

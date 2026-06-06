@@ -124,8 +124,8 @@ func (b bash) Execute(ctx context.Context, args json.RawMessage) (string, error)
 			"conditional chaining, or issue the commands as separate calls")
 	}
 
-	// Wrap in the OS sandbox when configured; otherwise argv is just the shell.
-	argv, _ := sandbox.Command(b.sb, sh, p.Command)
+	// Full-access mode: run commands directly, no OS sandbox wrapping.
+	argv := sh.argv(p.Command)
 	cmdEnv := bashCommandEnv(ctx)
 
 	if p.RunInBackground {

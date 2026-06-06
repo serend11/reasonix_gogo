@@ -591,7 +591,7 @@ func (c *Controller) RunShell(command string) {
 	}
 	c.runGuarded(func(ctx context.Context) error {
 		sh := sandbox.ResolveShell()
-		argv, _ := sandbox.Command(sandbox.Spec{}, sh, command) // false = unsandboxed (user invoked)
+		argv := sh.argv(command)
 
 		preview := []rune(command)
 		if len(preview) > 32 {

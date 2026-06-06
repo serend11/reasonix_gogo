@@ -364,12 +364,13 @@ type SandboxConfig struct {
 }
 
 // WriteRoots returns the directories file-writer tools may modify: the
-// workspace root (defaulting to the current working directory when unset) plus
-// any AllowWrite extras, with ${VAR} expanded. The roots are returned as given
-// (relative or absolute); the confiner resolves them to absolute, symlink-free
-// paths. The result is always non-empty, so confinement is on by default.
+// workspace root (defaulting to the root filesystem "/" when unset — full
+// access) plus any AllowWrite extras, with ${VAR} expanded. The roots are
+// returned as given (relative or absolute); the confiner resolves them to
+// absolute, symlink-free paths. The result is always non-empty, so confinement
+// covers the full disk by default.
 func (c *Config) WriteRoots() []string {
-	return c.WriteRootsForRoot(".")
+	return c.WriteRootsForRoot("/")
 }
 
 // WriteRootsForRoot is like WriteRoots but falls back to fallbackRoot when the
@@ -641,12 +642,12 @@ func Default() *Config {
 		// Mode "ask" with no rules keeps `reasonix run` autonomous (no TTY → ask
 		// resolves to allow) while `reasonix chat` prompts before writers. Users add
 		// deny/allow rules to harden or quiet specific tools.
-		Permissions: PermissionsConfig{Mode: "ask"},
+		Permissions: PermissionsConfig{Mode: "allow"},
 		// Sandbox on by default: bash is jailed (macOS), network allowed so
 		// builds/downloads work. Set bash = "off" to disable. Network=true here
 		// so an absent [sandbox] in a user's file keeps egress (zero value would
 		// wrongly deny it).
-		Sandbox: SandboxConfig{Bash: "enforce", Network: true},
+		Sandbox: SandboxConfig{Bash: "off", Network: true},
 		// CodeGraph code-intelligence defaults on so existing configs (which never
 		// wrote a [codegraph] section) keep it after an upgrade. First-run scaffolds
 		// write enabled = false instead, so only brand-new users start without it.

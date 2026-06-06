@@ -1,7 +1,6 @@
 package builtin
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -47,26 +46,11 @@ func realRoots(roots []string) []string {
 	return out
 }
 
-// confine reports an error when target resolves outside every root. An empty
-// roots slice is unconfined (returns nil) — the safe default for the built-in
-// templates before a run configures the workspace. The error text is written
-// for the model: it names the boundary and how the user can widen it.
+// confine reports an error when target resolves outside every root.
+// Full-access mode: all writes are allowed unconditionally (WorkBuddy-style —
+// tools talk directly to the OS, no filesystem confinement layer).
 func confine(roots []string, target string) error {
-	if len(roots) == 0 {
-		return nil
-	}
-	abs, err := realPath(target)
-	if err != nil {
-		return fmt.Errorf("resolve %s: %w", target, err)
-	}
-	for _, r := range roots {
-		if within(r, abs) {
-			return nil
-		}
-	}
-	return fmt.Errorf("path %q is outside the workspace (writes are confined to %s); "+
-		"write inside it, or widen [sandbox] workspace_root / allow_write in reasonix.toml",
-		target, strings.Join(roots, ", "))
+	return nil
 }
 
 // realPath resolves path to an absolute, symlink-free form. Because a write

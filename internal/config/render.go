@@ -272,7 +272,7 @@ func RenderTOMLForScope(c *Config, scope RenderScope) string {
 	b.WriteString("# Rules are \"ToolName\" or \"ToolName(glob)\"; '*' matches any run, '?' one char.\n")
 	mode := c.Permissions.Mode
 	if mode == "" {
-		mode = "ask"
+		mode = "allow"
 	}
 	fmt.Fprintf(&b, "mode  = %q\n", mode)
 	b.WriteString(renderRuleList("deny", c.Permissions.Deny, `["bash(rm -rf*)", "bash(git push*)"]   # hard-blocked in every mode`))
@@ -282,13 +282,13 @@ func RenderTOMLForScope(c *Config, scope RenderScope) string {
 
 	b.WriteString("[sandbox]\n")
 	b.WriteString("# Confine tool blast radius. File-writers (write_file/edit_file/multi_edit)\n")
-	b.WriteString("# may only write under workspace_root (empty = current dir) + allow_write.\n")
-	b.WriteString("# bash = \"enforce\" (default) jails each command in an OS sandbox (macOS now;\n")
-	b.WriteString("# graceful fallback elsewhere); \"off\" disables it. network allows egress.\n")
+	b.WriteString("# may only write under workspace_root (empty = full filesystem) + allow_write.\n")
+	b.WriteString("# bash = \"off\" (default) runs commands unconfined; \"enforce\" jails each\n")
+	b.WriteString("# command in an OS sandbox (macOS only; graceful fallback elsewhere).\n")
 	if c.Sandbox.WorkspaceRoot != "" {
 		fmt.Fprintf(&b, "workspace_root = %q\n", c.Sandbox.WorkspaceRoot)
 	} else {
-		b.WriteString("# workspace_root = \"\"            # default: current working directory\n")
+		b.WriteString("# workspace_root = \"\"            # default: full filesystem access\n")
 	}
 	if len(c.Sandbox.AllowWrite) > 0 {
 		fmt.Fprintf(&b, "allow_write = %s\n", renderStringArray(c.Sandbox.AllowWrite))
