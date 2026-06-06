@@ -42,8 +42,8 @@ type Message struct {
 	ReasoningSignature string      `json:"reasoning_signature,omitempty"`
 	Images             []ImagePart `json:"images,omitempty"`        // user: attached images for vision
 	ToolCalls          []ToolCall  `json:"tool_calls,omitempty"`    // set by assistant
-	ToolCallID         string      `json:"tool_call_id,omitempty"`  // links a tool result to its call
-	Name               string      `json:"name,omitempty"`          // tool message: tool name
+	ToolCallID         string     `json:"tool_call_id,omitempty"` // links a tool result to its call
+	Name               string     `json:"name,omitempty"`         // tool message: tool name
 }
 
 // ToolCall is a tool invocation requested by the model. Arguments is raw JSON.

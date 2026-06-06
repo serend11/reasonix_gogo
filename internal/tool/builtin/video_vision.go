@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"reasonix/internal/netclient"
+	"reasonix/internal/tool"
 )
 
 func init() { tool.RegisterBuiltin(videoVision{}) }
