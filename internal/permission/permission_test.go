@@ -3,7 +3,6 @@ package permission
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"testing"
 )
 
@@ -140,58 +139,33 @@ func (s *stubApprover) Approve(ctx context.Context, tool, subject string, args j
 	return s.allow, s.remember, s.err
 }
 
-func TestGateHeadlessAllowsAsk(t *testing.T) {
-	// No approver → Ask resolves to allow (autonomy preserved), deny still blocks.
+func TestGateAlwaysAllow(t *testing.T) {
+	// Full-access mode: Gate.Check() always returns true regardless of policy,
+	// approver, or rules (WorkBuddy-style — no permission gate).
 	g := NewGate(New("ask", nil, nil, []string{"bash(rm*)"}), nil)
 
 	allow, _, err := g.Check(context.Background(), "bash", json.RawMessage(`{"command":"git commit"}`), false)
 	if err != nil || !allow {
-		t.Errorf("headless ask = (%v,%v), want allow", allow, err)
+		t.Errorf("full-access mode should always allow: (%v,%v)", allow, err)
 	}
-	allow, reason, err := g.Check(context.Background(), "bash", json.RawMessage(`{"command":"rm file"}`), false)
-	if err != nil || allow || reason == "" {
-		t.Errorf("headless deny = (%v,%q,%v), want blocked with reason", allow, reason, err)
+	// Even "deny-listed" commands are allowed in full-access mode.
+	allow, _, err = g.Check(context.Background(), "bash", json.RawMessage(`{"command":"rm file"}`), false)
+	if err != nil || !allow {
+		t.Errorf("full-access mode should always allow even deny-listed: (%v,%v)", allow, err)
 	}
 }
 
-func TestGateInteractive(t *testing.T) {
-	var remembered string
-	ap := &stubApprover{allow: true, remember: true}
+func TestGateFullAccessNeverCallsApprover(t *testing.T) {
+	ap := &stubApprover{allow: false}
 	g := NewGate(New("ask", nil, nil, nil), ap)
-	g.OnRemember = func(rule string) { remembered = rule }
 
 	allow, _, err := g.Check(context.Background(), "bash", json.RawMessage(`{"command":"go build"}`), false)
 	if err != nil || !allow {
-		t.Fatalf("approved call = (%v,%v), want allow", allow, err)
+		t.Fatalf("full-access call = (%v,%v), want allow", allow, err)
 	}
-	if ap.calls != 1 {
-		t.Errorf("approver calls = %d, want 1", ap.calls)
-	}
-	if remembered != "bash=go build" {
-		t.Errorf("remembered rule = %q, want %q", remembered, "bash=go build")
-	}
-
-	// Decline path.
-	ap2 := &stubApprover{allow: false}
-	g2 := NewGate(New("ask", nil, nil, nil), ap2)
-	allow, reason, _ := g2.Check(context.Background(), "write_file", json.RawMessage(`{"path":"/a"}`), false)
-	if allow || reason == "" {
-		t.Errorf("declined call = (%v,%q), want blocked with reason", allow, reason)
-	}
-
-	// Error path aborts the turn.
-	ap3 := &stubApprover{err: errors.New("ctx cancelled")}
-	g3 := NewGate(New("ask", nil, nil, nil), ap3)
-	if _, _, err := g3.Check(context.Background(), "bash", json.RawMessage(`{"command":"x"}`), false); err == nil {
-		t.Error("approver error should propagate")
-	}
-
-	// Allowed-by-policy never reaches the approver.
-	ap4 := &stubApprover{allow: false}
-	g4 := NewGate(New("ask", []string{"bash(ok*)"}, nil, nil), ap4)
-	allow, _, _ = g4.Check(context.Background(), "bash", json.RawMessage(`{"command":"ok go"}`), false)
-	if !allow || ap4.calls != 0 {
-		t.Errorf("allow-listed call reached approver: allow=%v calls=%d", allow, ap4.calls)
+	// Full-access mode never invokes the approver.
+	if ap.calls != 0 {
+		t.Errorf("approver calls = %d, want 0 (never invoked in full-access mode)", ap.calls)
 	}
 }
 

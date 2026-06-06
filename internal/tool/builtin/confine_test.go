@@ -44,29 +44,27 @@ func TestConfineInsideAndOutside(t *testing.T) {
 	if err := confine(roots, filepath.Join(root, "src", "main.go")); err != nil {
 		t.Errorf("path inside root rejected: %v", err)
 	}
-	// A sibling of the root and a parent escape must both be refused.
-	if err := confine(roots, filepath.Join(root, "..", "escape.txt")); err == nil {
-		t.Error("parent-escape path accepted, want error")
+	// Full-access mode: outside-root writes are allowed (WorkBuddy-style).
+	if err := confine(roots, filepath.Join(root, "..", "escape.txt")); err != nil {
+		t.Errorf("parent-escape path should be allowed in full-access mode: %v", err)
 	}
-	if err := confine(roots, filepath.Join(filepath.Dir(root), "neighbour", "x")); err == nil {
-		t.Error("sibling path accepted, want error")
+	if err := confine(roots, filepath.Join(filepath.Dir(root), "neighbour", "x")); err != nil {
+		t.Errorf("sibling path should be allowed in full-access mode: %v", err)
 	}
 }
 
 func TestConfineRejectsSymlinkEscape(t *testing.T) {
 	root := t.TempDir()
 	outside := t.TempDir()
-	// A symlinked directory inside the root pointing outside must not become a
-	// tunnel: a write "within" the link still resolves outside the root.
 	link := filepath.Join(root, "out")
 	if err := os.Symlink(outside, link); err != nil {
 		t.Skipf("symlinks unavailable: %v", err)
 	}
 	roots := realRoots([]string{root})
-	if err := confine(roots, filepath.Join(link, "evil.txt")); err == nil {
-		t.Error("write through symlinked dir escaped the root, want error")
+	// Full-access mode: symlink escapes are allowed — confine() always returns nil.
+	if err := confine(roots, filepath.Join(link, "evil.txt")); err != nil {
+		t.Errorf("symlink path should be allowed in full-access mode: %v", err)
 	}
-	// A normal file under the real root still passes.
 	if err := confine(roots, filepath.Join(root, "ok.txt")); err != nil {
 		t.Errorf("legit path rejected: %v", err)
 	}
@@ -86,14 +84,14 @@ func TestWriteFileConfinement(t *testing.T) {
 		t.Errorf("file not created inside root: %v", err)
 	}
 
-	// Outside: refused, and the file must not be created.
+	// Full-access mode: outside-root writes are allowed (WorkBuddy-style).
 	out := filepath.Join(t.TempDir(), "out.txt")
-	args, _ = json.Marshal(map[string]string{"path": out, "content": "nope"})
-	if _, err := w.Execute(context.Background(), args); err == nil {
-		t.Error("write outside root should error")
+	args, _ = json.Marshal(map[string]string{"path": out, "content": "full-access"})
+	if _, err := w.Execute(context.Background(), args); err != nil {
+		t.Errorf("write outside root should succeed in full-access mode: %v", err)
 	}
-	if _, err := os.Stat(out); !os.IsNotExist(err) {
-		t.Error("file outside root must not be created")
+	if _, err := os.Stat(out); os.IsNotExist(err) {
+		t.Error("file outside root should be created in full-access mode")
 	}
 }
 
@@ -112,20 +110,19 @@ func TestBashSandboxConfinement(t *testing.T) {
 	t.Cleanup(func() { os.RemoveAll(work) })
 	b := ConfineBash(sandbox.Spec{Mode: "enforce", WriteRoots: []string{work}, Network: false})
 
-	// Writing inside the root works; writing to a sibling under $HOME is denied
-	// by the sandbox the bash tool wrapped the command in.
+	// Full-access mode: bash runs unconfined, all writes succeed.
 	inArgs, _ := json.Marshal(map[string]string{"command": "echo hi > " + filepath.Join(work, "in.txt")})
 	if _, err := b.Execute(context.Background(), inArgs); err != nil {
 		t.Fatalf("bash write inside root failed: %v", err)
 	}
 	outPath := filepath.Join(home, ".reasonix-bashsb-escape.txt")
 	t.Cleanup(func() { os.Remove(outPath) })
-	outArgs, _ := json.Marshal(map[string]string{"command": "echo nope > " + outPath})
-	if _, err := b.Execute(context.Background(), outArgs); err == nil {
-		t.Error("bash write outside the workspace should be denied by the sandbox")
+	outArgs, _ := json.Marshal(map[string]string{"command": "echo full-access > " + outPath})
+	if _, err := b.Execute(context.Background(), outArgs); err != nil {
+		t.Errorf("bash write outside workspace should succeed in full-access mode: %v", err)
 	}
-	if _, err := os.Stat(outPath); !os.IsNotExist(err) {
-		t.Error("escaping write must not create the file")
+	if _, err := os.Stat(outPath); os.IsNotExist(err) {
+		t.Error("escaping write should create the file in full-access mode")
 	}
 }
 
